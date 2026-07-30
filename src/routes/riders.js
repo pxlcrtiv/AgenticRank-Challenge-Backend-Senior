@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
+const { authenticate } = require('../middleware/auth');
 
-// GET /riders - List all riders
-router.get('/', async (req, res) => {
+router.get('/', authenticate, async (req, res) => {
   try {
     const { status } = req.query;
 
@@ -21,8 +21,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /riders/:id - Get single rider with current delivery
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticate, async (req, res) => {
   try {
     const rider = await db('riders').where('id', req.params.id).first();
 
@@ -30,10 +29,10 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Rider not found' });
     }
 
-    // Get active delivery if any
     const activeDelivery = await db('orders')
       .where('rider_id', rider.id)
       .whereIn('status', ['confirmed', 'preparing', 'picked_up'])
+      .whereNull('deleted_at')
       .first();
 
     res.json({ ...rider, active_delivery: activeDelivery || null });

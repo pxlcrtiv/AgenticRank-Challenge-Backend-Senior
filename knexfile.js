@@ -1,14 +1,30 @@
 require('dotenv').config();
 
+const baseConfig = {
+  client: 'pg',
+  migrations: {
+    directory: './src/migrations',
+  },
+  seeds: {
+    directory: './src/seeds',
+  },
+  pool: {
+    min: 2,
+    max: 10,
+  },
+};
+
 module.exports = {
   development: {
-    client: 'pg',
+    ...baseConfig,
     connection: process.env.DATABASE_URL,
-    migrations: {
-      directory: './src/migrations'
+  },
+  test: {
+    ...baseConfig,
+    connection: process.env.TEST_DATABASE_URL,
+    pool: {
+      min: 1,
+      max: 5,
     },
-    seeds: {
-      directory: './src/seeds'
-    }
-  }
+  },
 };

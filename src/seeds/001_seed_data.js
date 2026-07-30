@@ -138,6 +138,22 @@ exports.seed = async function (knex) {
   // Insert restaurants
   const restaurantIds = await knex('restaurants').insert(RESTAURANTS).returning('id');
 
+  // Insert menu items for each restaurant
+  const menuItemsToInsert = [];
+  for (let i = 0; i < restaurantIds.length; i++) {
+    const restaurant = RESTAURANTS[i];
+    const menu = MENU_ITEMS[restaurant.cuisine] || [];
+    for (const item of menu) {
+      menuItemsToInsert.push({
+        restaurant_id: restaurantIds[i].id,
+        name: item.name,
+        price: item.price,
+        is_available: true,
+      });
+    }
+  }
+  await knex('menu_items').insert(menuItemsToInsert);
+
   // Insert riders
   const riderIds = await knex('riders').insert(RIDERS).returning('id');
 
