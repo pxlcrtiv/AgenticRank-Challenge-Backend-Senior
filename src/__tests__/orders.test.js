@@ -239,4 +239,96 @@ describe('Orders', () => {
       expect(res.body.data.every((o) => o.status === 'pending')).toBe(true);
     });
   });
+
+  describe('POST /orders - idempotency', () => {
+    let customer;
+    let restaurant;
+    let menuItem;
+
+    beforeAll(async () => {
+      customer = await db('customers').first();
+      restaurant = await db('restaurants').first();
+      menuItem = await db('menu_items').where('restaurant_id', restaurant.id).first();
+    });
+
+    it('returns same order when Idempotency-Key is reused', async () => {
+      const request = require('supertest');
+      const key = `test-idempotency-${Date.now()}`;
+
+      const payload = {
+        restaurant_id: restaurant.id,
+        customer_id: customer.id,
+        items: [{ menu_item_id: menuItem.id, quantity: 1 }],
+      };
+
+      const res1 = await request(app)
+        .post('/orders')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', key)
+        .send(payload);
+
+      expect(res1.status).toBe(201);
+
+      const res2 = await request(app)
+        .post('/orders')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', key)
+        .send(payload);
+
+      expect(res2.status).toBe(200);
+      expect(res2.body.id).toBe(res1.body.id);
+    });
+
+    it('creates new order when different Idempotency-Key is used', async () => {
+      const request = require('supertest');
+
+      const payload = {
+        restaurant_id: restaurant.id,
+        customer_id: customer.id,
+        items: [{ menu_item_id: menuItem.id, quantity: 1 }],
+      };
+
+      const res1 = await request(app)
+        .post('/orders')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', `key-a-${Date.now()}`)
+        .send(payload);
+
+      const res2 = await request(app)
+        .post('/orders')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', `key-b-${Date.now()}`)
+        .send(payload);
+
+      expect(res1.status).toBe(201);
+      expect(res2.status).toBe(201);
+      expect(res1.body.id).not.toBe(res2.body.id);
+    });
+
+    it('creates new order when no Idempotency-Key is provided', async () => {
+      const request = require('supertest');
+
+      const res1 = await request(app)
+        .post('/orders')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          restaurant_id: restaurant.id,
+          customer_id: customer.id,
+          items: [{ menu_item_id: menuItem.id, quantity: 1 }],
+        });
+
+      const res2 = await request(app)
+        .post('/orders')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          restaurant_id: restaurant.id,
+          customer_id: customer.id,
+          items: [{ menu_item_id: menuItem.id, quantity: 1 }],
+        });
+
+      expect(res1.status).toBe(201);
+      expect(res2.status).toBe(201);
+      expect(res1.body.id).not.toBe(res2.body.id);
+    });
+  });
 });
