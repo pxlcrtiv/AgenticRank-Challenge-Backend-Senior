@@ -122,6 +122,14 @@ router.get('/:id', authenticate, async (req, res) => {
 router.post('/', authenticate, async (req, res) => {
   try {
     const { restaurant_id, customer_id, items, special_instructions } = req.body;
+    const idempotencyKey = req.headers['idempotency-key'] || null;
+
+    if (idempotencyKey) {
+      const existing = await db('orders').where('idempotency_key', idempotencyKey).first();
+      if (existing) {
+        return res.status(200).json(existing);
+      }
+    }
 
     if (!restaurant_id || !customer_id || !items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Missing required fields: restaurant_id, customer_id, items' });
@@ -183,6 +191,7 @@ router.post('/', authenticate, async (req, res) => {
         total: total.toFixed(2),
         special_instructions: special_instructions || null,
         status: 'pending',
+        idempotency_key: idempotencyKey,
       })
       .returning('*');
 
